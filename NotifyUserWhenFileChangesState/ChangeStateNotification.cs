@@ -41,6 +41,7 @@ namespace NotifyUserWhenFileChangesState
         public void OnCmd(ref EdmCmd poCmd, ref EdmCmdData[] ppoData)
         {
             string pathRootName = null;
+            string[] refFiles = null;
             try
             {
                 switch (poCmd.meCmdType)
@@ -59,7 +60,8 @@ namespace NotifyUserWhenFileChangesState
                             string ext = Path.GetExtension(fullPath);
                             if (ext == "dxf" || ext == "DXF")
                             {
-                                // TODO
+                                refFiles[0] = fullPath;
+                                AddCustomFileReference(pathRootName, refFiles);
                             }
                         }        
                         break;
