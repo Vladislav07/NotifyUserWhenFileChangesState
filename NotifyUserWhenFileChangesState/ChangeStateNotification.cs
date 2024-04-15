@@ -11,25 +11,21 @@ namespace NotifyUserWhenFileChangesState
     [Guid("B4B49E1D-5CA3-4627-B3D9-E6AB286C8C50"), ComVisible(true)]
     public class ChangeStateNotification : IEdmAddIn5
     {
-
+        SldWorks app = null;
         public void GetAddInInfo(ref EdmAddInInfo poInfo, IEdmVault5 poVault, IEdmCmdMgr5 poCmdMgr)
         {
 
             try
             {
-                poInfo.mbsAddInName = "C# Add-In";
-                poInfo.mbsCompany = "Dassault Systemes";
-                poInfo.mbsDescription = "Exercise demonstrating responding to a change state event.";
+                poInfo.mbsAddInName = "C# Add-In_PDM Reference file ";
+                poInfo.mbsCompany = "CUBY";
+                poInfo.mbsDescription = "...";
                 poInfo.mlAddInVersion = 1;
-
-                //Minimum SOLIDWORKS PDM Professional version
-                //needed for C# Add-Ins is 6.4
                 poInfo.mlRequiredVersionMajor = 6;
                 poInfo.mlRequiredVersionMinor = 4;
 
-                //Register to receive a notification when
-                //a file has changed state
                 poCmdMgr.AddHook(EdmCmdType.EdmCmd_PostAdd);
+                poCmdMgr.AddHook(EdmCmdType.EdmCmd_PreAdd);
             }
             catch (System.Runtime.InteropServices.COMException ex)
             {
@@ -44,25 +40,29 @@ namespace NotifyUserWhenFileChangesState
 
         public void OnCmd(ref EdmCmd poCmd, ref EdmCmdData[] ppoData)
         {
+            string pathRootName = null;
             try
             {
-
                 switch (poCmd.meCmdType)
-                {
-                    //A file has changed state
+                {                
+                    case EdmCmdType.EdmCmd_PreAdd:
+                        app = (SldWorks)Marshal.GetActiveObject("SldWorks.Application");
+                        ModelDoc2 model = app.IActiveDoc2;
+                        pathRootName = model.GetPathName();
+
+                        break;
                     case EdmCmdType.EdmCmd_PostAdd:
-                        foreach (EdmCmdData AffectedFile in ppoData)
+                          foreach (EdmCmdData AffectedFile in ppoData)
                         {
                             string fullPath = AffectedFile.mbsStrData1;
                             long iSnetworkFiles = AffectedFile.mlLongData1;
                             string ext = Path.GetExtension(fullPath);
                             if (ext == "dxf" || ext == "DXF")
                             {
-                               // TODO
-                            }         
-                        }              
+                                // TODO
+                            }
+                        }        
                         break;
-                    //The event isn't registered
                     default:
                        // ((EdmVault5)(poCmd.mpoVault)).MsgBox(poCmd.mlParentWnd, "An unknown command type was issued.");
                         break;
@@ -78,19 +78,14 @@ namespace NotifyUserWhenFileChangesState
             }
         }
 
-        public void AddCustomFileReference(string FileName)
+        public void AddCustomFileReference(string RootPathName, string[]refFiles)
         {
 
-            ModelDoc2 swModel;
-            Component2 swComponent;
-            SldWorks swApp;
+ 
             try
             {
-                swApp = GetObject
-                swModel = (ModelDoc2)swApp.ActiveDoc;
-
-                IEdmVault7 vault2 = null;
-           
+  
+                IEdmVault7 vault2 = null;         
                 IEdmVault5  vault1 = new EdmVault5();
                 vault2 = (IEdmVault7)vault1;
                 if (!vault1.IsLoggedIn)
@@ -99,30 +94,26 @@ namespace NotifyUserWhenFileChangesState
                 }
 
                 IEdmAddCustomRefs addCustRefs = (IEdmAddCustomRefs)vault2.CreateUtility(EdmUtility.EdmUtil_AddCustomRefs);
-
-                IEdmFile5 file = null;
+                IEdmFile5 rootFile = null;
                 IEdmFolder5 parentFolder = null;
    
-                file = vault2.GetFileFromPath(FileName, out parentFolder);
-                if (!file.IsLocked)
+                rootFile = vault2.GetFileFromPath(RootPathName, out parentFolder);
+                if (!rootFile.IsLocked)
                 {
-                    file.LockFile(parentFolder.ID, 0, (int)EdmLockFlag.EdmLock_Simple);
+                    rootFile.LockFile(parentFolder.ID, 0, (int)EdmLockFlag.EdmLock_Simple);
                 }
- 
                 
                 Boolean retCode = false;
-                
 
-  
-                addCustRefs.AddReferencesClipboard(file.ID);
+                addCustRefs.AddReferencesPath(rootFile.ID, ref refFiles);
                 addCustRefs.CreateTree((int)EdmCreateReferenceFlags.Ecrf_Nothing);
                 addCustRefs.ShowDlg(0);
                 retCode = addCustRefs.CreateReferences();
                 
                 // Check in the file
-                file.UnlockFile(0, "Custom reference added");
-               //-- int[] ppoFileIdArray = null;
-               //-- ppoFileIdArray[0] = file.ID;
+                rootFile.UnlockFile(0, "Custom reference added");
+                int[] ppoFileIdArray = null;
+                ppoFileIdArray[0] = rootFile.ID;
                 //Display current custom file references
                 retCode = addCustRefs.ShowEditReferencesDlg(ref ppoFileIdArray, 0);
 
